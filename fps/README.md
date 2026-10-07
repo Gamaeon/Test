@@ -5,8 +5,15 @@ Sandstein-Arena im Sonnenuntergang, Drohnen kommen in Wellen.
 
 ## Starten
 
-`fps/index.html` in einem Desktop-Browser öffnen (Chrome, Firefox, Edge).
+GitHub zeigt die Datei nur als Quellcode an. Zum Spielen:
+
+1. Auf GitHub `fps/index.html` öffnen, oben rechts auf **Download raw file** klicken.
+2. Die heruntergeladene `index.html` doppelklicken. Sie öffnet sich im Standard-Browser.
+
 Internet wird für Three.js (cdnjs) und die Schriften (Google Fonts) gebraucht.
+
+Am Handy oder Tablet erscheint automatisch eine Touch-Steuerung: linker Daumen läuft
+(virtueller Joystick), rechter Daumen schaut umher, Knöpfe für Feuer, Sprung, Nachladen und Pause.
 
 ## Steuerung
 

@@ -34,7 +34,7 @@ body {
   -webkit-user-select: none;
 }
 #app { position: fixed; inset: 0; }
-#app canvas { display: block; width: 100%; height: 100%; }
+#app > canvas { display: block; width: 100%; height: 100%; }
 
 /* ---------- HUD ---------- */
 #hud { position: absolute; inset: 0; pointer-events: none; }
@@ -135,6 +135,39 @@ kbd {
 .best { font-size: 12px; color: var(--paper-dim); }
 .best b { color: var(--amber); font-weight: 600; }
 
+/* touch controls */
+#touch { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
+#joyBase {
+  position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
+  border: 2px solid var(--amber-dim); background: rgba(18,12,23,.25); opacity: 0; pointer-events: none;
+}
+#joyBase.on { opacity: 1; }
+#joyKnob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(255,181,71,.55); }
+#joyHint {
+  position: absolute; left: 24px; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); font-size: 11px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--paper-dim); pointer-events: none;
+}
+.tbtn {
+  position: absolute; width: 64px; height: 64px; border-radius: 50%; touch-action: none;
+  font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--paper); background: rgba(18,12,23,.45); border: 2px solid var(--amber-dim);
+  -webkit-tap-highlight-color: transparent;
+}
+.tbtn.held { background: rgba(255,181,71,.55); color: var(--ink); }
+#tFire { width: 96px; height: 96px; right: 24px; bottom: calc(140px + env(safe-area-inset-bottom, 0px)); border-color: var(--amber); background: rgba(255,181,71,.22); font-size: 17px; }
+#tJump { right: 134px; bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+#tReload { right: 40px; bottom: calc(250px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; }
+#tPause { width: 44px; height: 44px; left: 50%; margin-left: -22px; top: calc(84px + env(safe-area-inset-top, 0px)); font-size: 13px; }
+@media (max-height: 460px) {
+  #radar { width: 88px; height: 88px; }
+  #tReload { bottom: calc(140px + env(safe-area-inset-bottom, 0px)); right: 132px; }
+  #tJump { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); right: 150px; }
+  #tFire { bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+  #tPause { top: calc(70px + env(safe-area-inset-top, 0px)); }
+  #healthNum { font-size: 34px; } #ammoNum { font-size: 38px; }
+}
+.note.ok { color: var(--amber); }
+
 @keyframes pulse { 50% { opacity: .55; } }
 @keyframes hitPop { 0% { opacity: 1; transform: scale(1.4); } 100% { opacity: 0; transform: scale(1); } }
 @keyframes banner { 0% { opacity: 0; transform: translateY(14px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
@@ -184,6 +217,14 @@ kbd {
       <div id="ammoRow"><div class="big" id="ammoNum">30</div><div id="ammoRes">/ ∞</div></div>
       <div id="reloadHint"></div>
     </div>
+    <div id="touch" hidden>
+      <div id="joyBase"><div id="joyKnob"></div></div>
+      <div id="joyHint">Linker Daumen: laufen · Rechts wischen: umsehen</div>
+      <button class="tbtn" id="tFire" type="button">Feuer</button>
+      <button class="tbtn" id="tJump" type="button">Sprung</button>
+      <button class="tbtn" id="tReload" type="button">R</button>
+      <button class="tbtn" id="tPause" type="button" aria-label="Pause">II</button>
+    </div>
     <div id="banner"><div id="bannerTitle">WELLE 1</div><div id="bannerSub">5 Drohnen im Anflug</div></div>
   </div>
 
@@ -206,7 +247,7 @@ kbd {
         <button class="btn" id="startBtn" type="button">Einsatz starten</button>
         <span class="best" id="bestMenu"></span>
       </div>
-      <div class="note" id="touchNote" hidden>Dieses Spiel braucht Maus und Tastatur. Auf Touch-Geräten ist es nicht spielbar.</div>
+      <div class="note ok" id="touchNote" hidden>Touch-Steuerung aktiv: linker Daumen läuft, rechter Daumen schaut, Knöpfe rechts schießen und springen. Am besten im Querformat spielen.</div>
     </div>
   </div>
 
@@ -702,8 +743,9 @@ function updatePlayer(dt) {
   if (keys.KeyS || keys.ArrowDown) wish.sub(fwd);
   if (keys.KeyD || keys.ArrowRight) wish.add(right);
   if (keys.KeyA || keys.ArrowLeft) wish.sub(right);
-  if (wish.lengthSq() > 0) wish.normalize();
-  const sprint = (keys.ShiftLeft || keys.ShiftRight) && (keys.KeyW || keys.ArrowUp);
+  if (joy.id !== null) wish.addScaledVector(fwd, -joy.y).addScaledVector(right, joy.x);
+  if (wish.lengthSq() > 1) wish.normalize();
+  const sprint = ((keys.ShiftLeft || keys.ShiftRight) && (keys.KeyW || keys.ArrowUp)) || (joy.id !== null && -joy.y > 0.92);
   const speed = sprint ? 9 : 5.6;
   const k = 1 - Math.exp(-(player.grounded ? 12 : 2.5) * dt);
   player.vel.x += (wish.x * speed - player.vel.x) * k;
@@ -1074,7 +1116,10 @@ showBest();
 const savedSens = parseFloat(store('dz-sens'));
 if (savedSens) { sens = savedSens; $('sens').value = String(savedSens); }
 $('sens').addEventListener('input', (e) => { sens = parseFloat(e.target.value); store('dz-sens', String(sens)); });
-if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('touchNote').hidden = false;
+let touchMode = false;
+function enableTouch() { touchMode = true; $('touchNote').hidden = false; }
+if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) enableTouch();
+addEventListener('touchstart', () => { if (!touchMode) enableTouch(); }, { passive: true });
 
 function lock() {
   try {
@@ -1091,7 +1136,7 @@ function lockFailed() {
 document.addEventListener('pointerlockerror', lockFailed);
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement) { lockWorked = true; skipMoves = 2; return; }
-  if (state === 'play' && !fallbackLook) pauseGame();
+  if (state === 'play' && !fallbackLook && !touchMode) pauseGame();
 });
 
 function resetGame() {
@@ -1112,16 +1157,23 @@ function startGame() {
   resetGame();
   state = 'play'; skipMoves = 2;
   $('menu').hidden = true; $('over').hidden = true; $('pause').hidden = true; $('hud').hidden = false;
-  lock();
+  takeInput();
+}
+// Make sure keys reach the game (the page may sit inside a frame) and pick the control scheme.
+function takeInput() {
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); window.focus(); } catch (e) { /* ignore */ }
+  $('touch').hidden = !touchMode;
+  if (!touchMode) lock();
 }
 function pauseGame() {
   if (state !== 'play') return;
-  state = 'pause'; firing = false;
+  state = 'pause'; firing = false; keys.Space = false;
+  joy.id = null; joy.x = joy.y = 0; lookId = null; joyBase.classList.remove('on');
   $('pause').hidden = false;
 }
 function resumeGame() {
   initAudio();
-  state = 'play'; skipMoves = 2; $('pause').hidden = true; lock();
+  state = 'play'; skipMoves = 2; $('pause').hidden = true; takeInput();
 }
 function toMenu() {
   state = 'menu';
@@ -1143,7 +1195,60 @@ $('startBtn').addEventListener('click', startGame);
 $('restartBtn').addEventListener('click', startGame);
 $('resumeBtn').addEventListener('click', resumeGame);
 $('quitBtn').addEventListener('click', toMenu);
-canvas.addEventListener('click', () => { if (state === 'play' && !document.pointerLockElement && !fallbackLook) lock(); });
+canvas.addEventListener('click', () => { if (state === 'play' && !document.pointerLockElement && !fallbackLook && !touchMode) lock(); });
+
+/* touch: left thumb = joystick, right thumb = look, buttons = fire / jump / reload / pause */
+const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+let lookId = null, lookX = 0, lookY = 0;
+const touchLayer = $('touch'), joyBase = $('joyBase'), joyKnob = $('joyKnob');
+const JOY_R = 55;
+touchLayer.addEventListener('pointerdown', (e) => {
+  if (e.target !== touchLayer || state !== 'play') return;
+  if (e.clientX < innerWidth * 0.45 && joy.id === null) {
+    joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0;
+    joyBase.style.left = e.clientX + 'px'; joyBase.style.top = e.clientY + 'px';
+    joyKnob.style.transform = ''; joyBase.classList.add('on'); $('joyHint').hidden = true;
+  } else if (lookId === null) {
+    lookId = e.pointerId; lookX = e.clientX; lookY = e.clientY;
+  } else return;
+  try { touchLayer.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+});
+touchLayer.addEventListener('pointermove', (e) => {
+  if (e.pointerId === joy.id) {
+    let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > JOY_R) { dx *= JOY_R / d; dy *= JOY_R / d; }
+    joy.x = dx / JOY_R; joy.y = dy / JOY_R;
+    joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  } else if (e.pointerId === lookId && state === 'play') {
+    const dx = e.clientX - lookX, dy = e.clientY - lookY;
+    lookX = e.clientX; lookY = e.clientY;
+    player.yaw -= dx * 0.0055 * sens;
+    player.pitch = clamp(player.pitch - dy * 0.0055 * sens, -1.5, 1.5);
+    gun.swayX += dx * 0.00012; gun.swayY += dy * 0.00012;
+  }
+});
+function touchEnd(e) {
+  if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; joyBase.classList.remove('on'); }
+  if (e.pointerId === lookId) lookId = null;
+}
+touchLayer.addEventListener('pointerup', touchEnd);
+touchLayer.addEventListener('pointercancel', touchEnd);
+function holdButton(id, down, up) {
+  const el = $(id);
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    el.classList.add('held'); if (state === 'play') down();
+  });
+  const release = () => { el.classList.remove('held'); if (up) up(); };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+}
+holdButton('tFire', () => { firing = true; }, () => { firing = false; });
+holdButton('tJump', () => { keys.Space = true; }, () => { keys.Space = false; });
+holdButton('tReload', () => startReload());
+holdButton('tPause', () => pauseGame());
 
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
